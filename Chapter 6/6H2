@@ -1,0 +1,144 @@
+```{r}
+
+# SOLUTION OBTAINED ONLINE
+
+library(rethinking)
+data(Howell1)
+d<- Howell1
+d$age <- (d$age - mean(d$age))/sd(d$age)
+
+# randomly split dataframe into two equally sized dataframe
+set.seed(1000)
+i <- sample(1:nrow(d), size=nrow(d)/2)
+d1 <- d[i,]
+d2 <- d[-i,]
+# use the cases in d1 to fit models and d2 to evaluate them
+```
+
+```{r}
+# use weakly regularizing priors for all parameters
+# this means to choose a prior that is not too specific for the purpose of generalization
+# and to prevent over-fitting
+
+# polynomial order 1 (linear)
+f1 <- alist(
+    height ~ dnorm(mean = mu, sd = sigma),
+    mu <- alpha + beta.1*age,
+    c(alpha, beta.1) ~ dnorm(mean = 0, sd = 100),
+    sigma ~ dunif(min = 0, max = 50)
+)
+
+# polynomial order 2
+f2 <- alist(
+  height ~ dnorm(mean = mu, sd = sigma),
+  mu <- alpha + beta.1*age + beta.2*age^2,
+  c(alpha, beta.1, beta.2) ~ dnorm(mean = 0, sd = 100),
+  sigma ~ dunif(min = 0, max = 50)
+)
+
+# polynomial order 3
+f3 <- alist(
+  height ~ dnorm(mean = mu, sd = sigma),
+  mu <- alpha + beta.1*age + beta.2*age^2 + beta.3*age^3,
+  c(alpha, beta.1, beta.2, beta.3) ~ dnorm(mean = 0, sd = 100),
+  sigma ~ dunif(min = 0, max = 50)
+)
+
+# polynomial order 4
+f4 <- alist(
+  height ~ dnorm(mean = mu, sd = sigma),
+  mu <- alpha + beta.1*age + beta.2*age^2 + beta.3*age^3 + beta.4*age^4,
+  c(alpha, beta.1, beta.2, beta.3, beta.4) ~ dnorm(mean = 0, sd = 100),
+  sigma ~ dunif(min = 0, max = 50)
+)
+
+# polynomial order 5
+f5 <- alist(
+  height ~ dnorm(mean = mu, sd = sigma),
+  mu <- alpha + beta.1*age + beta.2*age^2 + beta.3*age^3 + beta.4*age^4 + beta.5*age^5,
+  c(alpha, beta.1, beta.2, beta.3, beta.4, beta.5) ~ dnorm(mean = 0, sd = 100),
+  sigma ~ dunif(min = 0, max = 50)
+)
+
+# polynomial order 6
+f6 <- alist(
+  height ~ dnorm(mean = mu, sd = sigma),
+  mu <- alpha + beta.1*age + beta.2*age^2 + beta.3*age^3 + beta.4*age^4 + beta.5*age^5 + beta.6*age^6,
+  c(alpha, beta.1, beta.2, beta.3, beta.4, beta.5, beta.6) ~ dnorm(mean = 0, sd = 100),
+  sigma ~ dunif(min = 0, max = 50)
+)
+
+alpha.start <- mean(d$height)
+sigma.start <- sd(d$height)
+
+## fit our models
+# specify the initial values of the parameters (mean and standard deviation of Y)
+# recall that our baseline assumption is that the variables have no effect on the height
+m1 <- map(flist = f1, data = d1, start = list(alpha = alpha.start, sigma = sigma.start, beta.1 = 0))
+m2 <- map(flist = f2, data = d1, start = list(alpha = alpha.start, sigma = sigma.start, beta.1 = 0, beta.2 = 0))
+m3 <- map(flist = f3, data = d1, start = list(alpha = alpha.start, sigma = sigma.start, beta.1 = 0, beta.2 = 0, beta.3 = 0))
+m4 <- map(flist = f4, data = d1, start = list(alpha = alpha.start, sigma = sigma.start, beta.1 = 0, beta.2 = 0, beta.3 = 0, beta.4 = 0))
+m5 <- map(flist = f5, data = d1, start = list(alpha = alpha.start, sigma = sigma.start, beta.1 = 0, beta.2 = 0, beta.3 = 0, beta.4 = 0, beta.5 = 0))
+m6 <- map(flist = f6, data = d1, start = list(alpha = alpha.start, sigma = sigma.start, beta.1 = 0, beta.2 = 0, beta.3 = 0, beta.4 = 0, beta.5 = 0, beta.6 = 0))
+
+```
+
+```{r}
+# for each model, produce a plot with model averaged mean and 97% confidence interval of the mean superimposed on the raw data. How do predictions differ across models?
+
+n.trials <- 10000
+# range of d$age is (-1.4, 2.8)
+age.seq <- seq(from = -2, to = 3.5, length.out = 58)
+# creates a dataframe of these hypothetical ages
+prediction.data <- data.frame(age = age.seq)
+
+# function to compute the mean of each model
+# computes the mean of each linear model at each sample for each case in the data
+computeMu <- function(model, data, n.trials) {
+  mu <- link(fit = model, data = data, n = n.trials)
+  return(mu)
+}
+
+# function to compute the model-averaged mean
+computeMuMean <- function(mu) {
+  mu.mean <- apply(X = mu, MARGIN = 2, FUN = mean)
+  return(mu.mean)
+}
+
+# function to compute the 97% PI of the mean
+computeMuPI <- function(mu) {
+  mu.PI <- apply(X = mu, MARGIN = 2, FUN = PI, prob = .97)
+  return(mu.PI)
+}
+
+# function to simulate heights
+simulateHeights <- function(model, prediction.data) {
+  simulated.heights <- sim(fit = model, data = prediction.data)
+  return(simulated.heights)
+}
+
+plotResults <- function(model, prediction.data, original.data, n.trials) {
+  mu <- computeMu(model, prediction.data, n.trials)
+  mu.mean <- computeMuMean(mu)
+  mu.PI <- computeMuPI(mu)
+  simulated.heights <- simulateHeights(model = model, prediction.data = prediction.data)
+  simulated.heights.PI <- apply(X = simulated.heights, MARGIN = 2, FUN = PI)
+  plot(height ~ age, data = original.data, col = rangi2, xlim = c(-2,3.5))
+  lines(x = prediction.data$age, y = mu.mean, lty = 2)
+  lines(x = prediction.data$age, y = mu.PI[1,], lty = 2)
+  lines(x = prediction.data$age, y = mu.PI[2,], lty = 2)
+  shade(object = simulated.heights.PI, lim = prediction.data$age)
+}
+
+```
+
+```{r}
+## plot results
+plotResults(model = m1, prediction.data = prediction.data, original.data = d1, n.trials = n.trials)
+plotResults(model = m2, prediction.data = prediction.data, original.data = d1, n.trials = n.trials)
+plotResults(model = m3, prediction.data = prediction.data, original.data = d1, n.trials = n.trials)
+plotResults(model = m4, prediction.data = prediction.data, original.data = d1, n.trials = n.trials)
+plotResults(model = m5, prediction.data = prediction.data, original.data = d1, n.trials = n.trials)
+plotResults(model = m6, prediction.data = prediction.data, original.data = d1, n.trials = n.trials)
+
+```
