@@ -1,0 +1,173 @@
+---
+title: "Chapter 6 Questions - Bayesian Statistics"
+author: "Melissa Van Bussel"
+date: "June 25, 2018"
+output:
+  pdf_document:
+    highlight: zenburn
+    latex_engine: lualatex
+  html_document: default
+  word_document: default
+mainfont: Arial
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+Chapter 6 points: 2 + 9 + 4 = 15 points total. 
+
+#\textcolor{cyan}{Easy (2 points total)}
+
+##\textcolor{cyan}{6E1}
+
+The three criteria are: continuity, increase with number of events, and additivity. 
+
+##\textcolor{cyan}{6E2}
+
+```{r}
+p <- c(0.7, 0.3)
+-1 * sum(p * log(p))
+```
+
+##\textcolor{cyan}{6E3}
+
+```{r}
+p <- c(0.2, 0.25, 0.25, 0.3)
+-1 * sum(p * log(p))
+```
+
+##\textcolor{cyan}{6E4}
+
+```{r}
+p <- c(1/3, 1/3, 1/3)
+-1 * sum(p * log(p))
+```
+
+#\textcolor{cyan}{Medium (9 points total)}
+
+##\textcolor{cyan}{6M2 (2 points)}
+
+Model selection is picking a model based on diagnostics (such as information criteria). Model averaging is weighting each model by its distance from the "best model". 
+
+##\textcolor{cyan}{6M3 (2 points)}
+
+It wouldn't make sense to compare 2 models that are on a different number of observations because that means you're comparing models on different data. One model might appear better than the other because the data is better, which would have nothing to do with the model itself. 
+
+##\textcolor{cyan}{6M4 (2 points)}
+
+When a prior becomes more concentrated/specific in one area, it means that there is less freedom for the other parameters to move around. This means that the model will be less flexible, and the DIC and WAIC will reflect this. 
+
+##\textcolor{cyan}{6M5 (1 point)}
+
+Informative priors reduce overfitting of a model by reducing the sensitivity of a model to a sample. 
+
+##\textcolor{cyan}{6M6 (2 points)}
+
+If you give a prior that is TOO informative, the model will not be able to "learn" properly, so the best values will not be found and the result will be underfitting. 
+
+#\textcolor{cyan}{Hard (4 points total)}
+
+```{r}
+library(rethinking) 
+data(Howell1) 
+d <- Howell1 
+d$age <- (d$age - mean(d$age)) / sd(d$age) 
+set.seed(1000) 
+i <- sample(1:nrow(d), size = nrow(d) / 2) 
+d1 <- d[i, ] 
+d2 <- d[-i, ]
+```
+
+Next, we fit all of the models: 
+
+```{r}
+model1 <- map(alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1 * age,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50)
+), data = d1, start = list(a = mean(d1$height), sigma = sd(d1$height), 
+                           b1 = 0))
+
+model2 <- map(alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1 * age + b2 * age^2,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50)
+), data = d1, start = list(a = mean(d1$height), sigma = sd(d1$height),
+                           b1 = 0, b2 = 0))
+
+model3 <- map(alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1 * age + b2 * age^2 + b3 * age^3,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50)
+), data = d1, start = list(a = mean(d1$height), sigma = sd(d1$height),
+                           b1 = 0, b2 = 0, b3 = 0))
+
+model4 <- map(alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1 * age + b2 * age^2 + b3 * age^3 + b4*age^4,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50)
+), data = d1, start = list(a = mean(d1$height), sigma = sd(d1$height),
+                           b1 = 0, b2 = 0, b3 = 0, b4 = 0))
+
+model5 <- map(alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1 * age + b2 * age^2 + b3*age^3 + b4*age^4 + b5*age^5,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50)
+), data = d1, start = list(a = mean(d1$height), sigma = sd(d1$height),
+                           b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0))
+
+model6 <- map(alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1 * age + b2 * age^2 + b3*age^3 + b4*age^4 + b5*age^5 + b6*age^6,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50)
+), data = d1, start = list(a = mean(d1$height), sigma = sd(d1$height),
+                           b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0))
+```
+
+##\textcolor{cyan}{6H1 (2 points)}
+
+For question 1, we compare them: 
+
+```{r}
+compare(model1, model2, model3, model4, model5, model6)
+```
+
+We see that model 4 performs the best, taking 0.58 of the Akaike weight. This being said, however, the top 3 models here are significantly better than the bottom 3. 
+
+##\textcolor{cyan}{6H2 (1 point)}
+
+```{r}
+age.seq <- seq(from = -2, to = 3, length.out = 30)
+mu <- link(model4, data = list(age = age.seq))
+mu_mean <- apply(mu, 2, mean)
+mu_pi <- apply(mu, 2, PI, prob = 0.97)
+h <- sim(model4, data = list(age = age.seq))
+height_pi <- apply(h, 2, PI)
+
+plot(height ~ age, d1, col = "slateblue", xlim = c(-2,3))
+lines(age.seq, mu_mean)
+shade(mu_pi, age.seq)
+shade(height_pi, age.seq)
+```
+
+If we were to do this for all 6 of the models we made, we would see that the 4th order one hits the "sweet spot" -- the other ones are either overfit or underfit. Even this one isn't great, but it's definitely better than the others.
+ 
+##\textcolor{cyan}{6H3 (1 point)}
+
+```{r}
+h_ensemble <- ensemble(model4, model5, model6, data = list(age = age.seq))
+mu_mean <- apply(h_ensemble$link, 2, mean)
+mu_pi <- apply(h_ensemble$link, 2, PI)
+height_pi <- apply(h_ensemble$sim, 2, PI)
+plot(height ~ age, d1, col = "slateblue", xlim = c(-2, 3))
+lines(age.seq, mu_mean)
+shade(mu_pi, age.seq)
+shade(height_pi, age.seq)
+```
