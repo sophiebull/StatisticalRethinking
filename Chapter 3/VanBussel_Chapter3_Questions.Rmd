@@ -1,0 +1,157 @@
+---
+title: "Chapter 3 Questions"
+author: "Melissa Van Bussel"
+date: "June 4, 2018"
+output:
+  pdf_document:
+    highlight: zenburn
+    latex_engine: lualatex
+  html_document: default
+  word_document: default
+mainfont: Arial
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Chapter 3 points: 2 + 7 + 9 = 18 
+ 
+#\textcolor{cyan}{Easy (2 points total)}
+
+The following code is given in the question: 
+
+```{r}
+library(rethinking)
+p_grid <- seq(from = 0, to = 1, length.out = 1000) 
+prior <- rep(1, 1000) 
+likelihood <- dbinom(6 , size = 9, prob = p_grid) 
+posterior <- likelihood * prior 
+posterior <- posterior / sum(posterior) 
+set.seed(100) 
+samples <- sample(p_grid, prob = posterior, size = 1e4, replace = TRUE) 
+```
+
+##\textcolor{cyan}{3E1-3E7}
+
+```{r}
+question3e1 <- length(which(posterior < 0.2)) / length(posterior)
+question3e2 <- length(which(posterior > 0.8)) / length(posterior)
+question3e3 <- length(which(posterior > 0.2 & posterior < 0.8)) / length(posterior)
+question3e4 <- quantile(posterior, 0.2)
+question3e5 <- quantile(posterior, 0.8)
+
+# Narrowest interval would be centred at 0.5, so we want 33% above and below 0.5
+question3e6upper <- quantile(posterior, 0.5+0.33)
+question3e6lower <- quantile(posterior, 0.5-0.33)
+
+# Equal on both sides would mean there's (0.33/2) on either side. 
+question3e7upper <- quantile(posterior, 1-(0.33/2))
+question3e7lower <- quantile(posterior, 0.33/2)
+```
+
+#\textcolor{cyan}{Medium (9 points total)}
+
+##\textcolor{cyan}{3M1 (2 points)}
+
+```{r}
+p_grid <- seq(from = 0, to = 1, length.out = 1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(8, size = 15, prob = p_grid)
+unstd.posterior <- likelihood * prior 
+posterior <- unstd.posterior / sum(unstd.posterior)
+```
+
+##\textcolor{cyan}{3M2 (2 points)}
+
+```{r}
+samples <- sample(x = p_grid, size = 10000, prob = posterior, replace = TRUE)
+HPDI(samples, 0.9)
+```
+
+##\textcolor{cyan}{3M3 (1 point)}
+
+```{r}
+posterior_predictive_check <- rbinom(n = 10000, size = 15, prob = samples)
+sum(posterior_predictive_check == 8) / 10000
+```
+
+##\textcolor{cyan}{3M4 (2 points)}
+
+```{r}
+posterior_predictive_check <- rbinom(n = 10000, size = 9, prob = samples)
+sum(posterior_predictive_check == 6) / 10000
+```
+
+##\textcolor{cyan}{3M5 (2 points)}
+
+```{r}
+prior <- c(rep(0, 500), rep(1, 500))
+likelihood <- dbinom(8, size = 15, prob = p_grid)
+unstd.posterior <- likelihood * prior 
+posterior <- unstd.posterior / sum(unstd.posterior)
+
+# 3M2
+samples <- sample(x = p_grid, size = 10000, prob = posterior, replace = TRUE)
+HPDI(samples, 0.9)
+# 3M3
+posterior_predictive_check <- rbinom(n = 10000, size = 15, prob = samples)
+sum(posterior_predictive_check == 8) / 10000
+# 3M4
+posterior_predictive_check <- rbinom(n = 10000, size = 9, prob = samples)
+sum(posterior_predictive_check == 6) / 10000
+```
+
+#\textcolor{cyan}{Hard (7 points total)}
+
+The following code is used in all of the following questions.
+
+```{r}
+library(rethinking) 
+data(homeworkch3)
+```
+
+##\textcolor{cyan}{3H1 (1 point)}
+
+```{r}
+num_births <- length(birth1) + length(birth2)
+num_boys <- sum(birth1) + sum(birth2)
+prior <- rep(1, 1000)
+likelihood <- dbinom(x = num_boys, size = num_births, prob = p_grid)
+unstd.posterior <- prior * likelihood
+posterior <- unstd.posterior / sum(unstd.posterior)
+
+p_grid[which.max(posterior)]
+```
+
+##\textcolor{cyan}{3H2 (2 points)}
+
+```{r}
+my_sample <- sample(p_grid, 10000, prob = posterior, replace = TRUE)
+HPDI(my_sample, 0.5)
+HPDI(my_sample, 0.89)
+HPDI(my_sample, 0.97)
+```
+
+##\textcolor{cyan}{3H3 (2 points)}
+
+```{r}
+simulation <- rbinom(10000, size = 200, prob = my_sample)
+dens(simulation)
+# yes, it looks like 111 is right near the centre of the distribution.
+```
+
+##\textcolor{cyan}{3H4 (1 point)}
+
+```{r}
+new_simulation <- rbinom(10000, size = 100, prob = my_sample)
+dens(new_simulation)
+```
+
+##\textcolor{cyan}{3H5 (1 point)}
+
+```{r}
+boys_born_after_girls <- birth2[birth1 == 0]
+posterior_predictive_check <- rbinom(n = 10000, size = length(boys_born_after_girls), prob = length(boys_born_after_girls) / length(birth2))
+dens(posterior_predictive_check)
+```

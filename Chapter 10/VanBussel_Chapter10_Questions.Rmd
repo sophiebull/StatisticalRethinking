@@ -1,0 +1,130 @@
+---
+title: "Chapter 10 Questions"
+author: "Melissa Van Bussel"
+date: "July 20, 2018"
+output:
+  pdf_document:
+    highlight: zenburn
+    latex_engine: lualatex
+  html_document: default
+  word_document: default
+mainfont: Arial
+---
+
+```{r setup, include=FALSE, cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Points for chapter 10: 2 + 8 + 4 = 14 total points.
+
+#\textcolor{cyan}{Easy Questions (2 points total)}
+
+##\textcolor{cyan}{10E1}
+
+```{r}
+log(0.35 / (1 - 0.35))
+```
+
+##\textcolor{cyan}{10E2}
+
+```{r, message = FALSE, warning = FALSE}
+library(rethinking)
+inv_logit(3.2)
+```
+
+##\textcolor{cyan}{10E3}
+
+```{r}
+q10e3 <- exp(1.7)
+q10e3
+```
+
+This implies that for every one unit increase in the predictor variable, the odds of the event are multiplied by `r q10e3`. 
+
+##\textcolor{cyan}{10E4}
+
+If some observations came from longer periods than others, then you would use an offset so account for the fact that we expect counts from larger periods to be bigger.
+
+#\textcolor{cyan}{Medium Questions (8 points total)}
+
+##\textcolor{cyan}{10M2 (2 points)}
+
+```{r}
+increase <- exp(1.7)
+```
+
+It means that when the predictor variable increases by one unit, the expected count will incerase by `r increase`. 
+
+##\textcolor{cyan}{10M3 (2 points)}
+
+We usually use a logit link for a binomial generalized linear model. This is because the logit allows us to map continuous vaues to a probability bounded between 0 and 1.
+
+##\textcolor{cyan}{10M4 (2 points)}
+
+We usually use a log function for a Poisson generalized linear model. This is because the log allows us to map continuous values to values that are strictly positive. 
+
+##\textcolor{cyan}{10M5 (2 points)}
+
+If you were to use a logit function for a Poisson GLM, then $\lambda$ would have to lie between 0 and 1. A real world situation where this might be used would be if you knew that the true rate was extremely small
+
+##\textcolor{cyan}{10M6 (2 points)}
+
+The 2 distributions have the same constraints since Poisson is basically just a simplified version of the binomial. The two constraints are: 
+
+* Discrete, binary outcomes
+* Constant expected values
+
+#\textcolor{cyan}{Hard Questions (4 points total)}
+
+##\textcolor{cyan}{10H1 (2 points)}
+
+Just copy paste the model from the example in the textbook and use **map()** instead of **map2stan()**.
+
+```{r, message = FALSE, warning= FALSE, results = "hide"}
+data(chimpanzees)
+  d <- chimpanzees
+  d2 <- d
+  d2$recipient <- NULL
+m10.4_map <- map(
+    alist(
+      pulled_left ~ dbinom(1, p),
+      logit(p) <- a[actor] + (bp + bpC*condition)*prosoc_left,
+      a[actor] ~ dnorm(0,10),
+      bp ~ dnorm(0,10),
+      bpC ~ dnorm(0,10)),
+data = d2)
+```
+
+##\textcolor{cyan}{10H2 (2 points)}
+
+First we need to also have the model from the chapter (so, it's the one from the last question but using **map2stan()** instead of **map()**):
+
+```{r, results ="hide"}
+m10.4 <- map2stan(
+    alist(
+      pulled_left ~ dbinom(1, p),
+      logit(p) <- a[actor] + (bp + bpC*condition)*prosoc_left,
+      a[actor] ~ dnorm(0,10),
+      bp ~ dnorm(0,10),
+      bpC ~ dnorm(0,10)),
+data = d2)
+```
+
+Now we can compare the two by looking at the precis for each: 
+
+```{r}
+precis(m10.4_map)
+precis(m10.4)
+```
+
+The main difference is in the coefficient for the second intercept. 
+
+Now we can compare their WAIC values: 
+
+```{r}
+WAIC(m10.4)
+WAIC(m10.4_map)
+```
+
+Not sure why this queston even asked us to compare their WAIC values, because Richard McElreath built it right into his package that you shouldn't be comparing models computed using different algorithms... anyways, though, the WAIC for the map estimate is larger than the WAIC for the MCMC estimate, which makes sense.
+

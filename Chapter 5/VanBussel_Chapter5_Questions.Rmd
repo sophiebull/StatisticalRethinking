@@ -1,0 +1,287 @@
+---
+title: "Chapter 5 Questions"
+author: "Melissa Van Bussel"
+date: "June 20, 2018"
+output:
+  pdf_document:
+    highlight: zenburn
+    latex_engine: lualatex
+  html_document: default
+  word_document: default
+mainfont: Arial
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Chapter 5 points: 2 + 8 + 6 = 16 points total.
+
+#\textcolor{cyan}{Easy Questions (2 points total)}
+
+##\textcolor{cyan}{5E1}
+
+(1) is single linear regression, so not (1). (2) is missing an intercept term, meaning the intercept term is 0. This is known as regression through the origin, and is indeed multiple linear regression. (3) and (4) are also multiple linear regression. 
+
+##\textcolor{cyan}{5E2}
+
+$$d_i \sim \text{Normal(} \mu, \sigma) $$
+$$\mu_i = \alpha + \beta_l l_i + \beta_p p_i $$
+
+##\textcolor{cyan}{5E3}
+
+Both slope parameters should be on the right side of zero since the question says they are both positively correlated. The model can be represented by
+
+$$d_i \sim \text{Normal(} \mu, \sigma) $$
+$$\mu_i = \alpha + \beta_f f_i + \beta_p p_i $$
+
+##\textcolor{cyan}{5E4}
+
+(1) is equivalent (the intercept term ends up being for C), and (3) is equivalent for the same reason but the intercept term is now for A instead of C. 
+
+#\textcolor{cyan}{Medium Questions (8 points total)}
+
+##\textcolor{cyan}{5M1 (2 points)}
+ 
+An example of a spurious correlation would be:
+(suppose) Per capita consumption of caviar correlates with % of population that voted Conservative
+
+Upon first glance, one might think that a Conservative government gives people free caviar or something, when in reality, rich people can afford caviar and rich people also tend to vote conservative. The spurious correlation here would be average annual income.
+
+##\textcolor{cyan}{5M2 (2 points)}
+
+A masked relationship is where two predictor variables are both correlated with the outcome variable, but one is positively correlated and the other is negatively correlated, so they appear to "cancel each other out". In addition, the two predictor variables are positively correlated with each other. 
+
+For example... the outcome variable could be BMI. One predictor would be weight, and the other predictor would be height. Since BMI = weight/height, having a higher weight will positively correlate with BMI while having a higher height will negatively correlate with BMI. Obviously, height and weight are positively correlated with each other. 
+
+##\textcolor{cyan}{5M3 (2 points)}
+
+A high divorce rate might cause a higher marriage rate because people who get divorced become single and are eligible to marry again, increasing the overall marriage rate.
+
+
+##\textcolor{cyan}{5M5 (2 points)}
+
+Outcome: Obesity Rate 
+Mechanism 1: Less driving = more exercise
+Mechanism 2: Less driving = less eating out 
+
+Another predictor that would lead to more exercise and less eating out would be:
+- number of sports played
+- number of days per month that the person goes to the gym 
+- basically anything that leads people to live healthy, active lives. 
+
+#\textcolor{cyan}{Hard Questions (6 points total)}
+
+The 3 hard exercises use the foxes data from the rethinking package. This dataset contains information on the vulpes vulpes species of fox. The 5 varaibles are: 
+
+(1) group: Number of social group that individual fox belongs to 
+(2) avgfood: Average amount of food available in the territory
+(3) groupsize: # of foxes in the social group 
+(4) area: Size of the territory
+(5) weight: Body weight of the individual fox
+
+```{r}
+library(rethinking)
+data(foxes)
+d <- foxes
+head(d)
+```
+
+##\textcolor{cyan}{5H1 (2 points)}
+
+We want to fit 2 regressions using map. The first is body weight as a function of territory size, and the second is body weight as a function of group size. Then we want to plot the results with the MAP regression line and 95% interval of the mean. Finally, we determine whether either of the variables are important (on their own) for predicting body weight. 
+
+First, let's look at the distribution of the two predictors we're interested in, so we can determine what values to use in our regressions: 
+
+```{r}
+# let's just use the rounded values
+round(mean(d$area))
+round(sd(d$area))
+round(mean(d$groupsize))
+round(sd(d$groupsize))
+```
+
+```{r}
+# Compute the two models
+lmod1 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bt * area,
+    a ~ dnorm(3, 3),
+    bt ~ dnorm(0, 5),
+    sigma ~ dunif(0, 10)
+  ), data = d
+)
+
+lmod2 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bg * groupsize,
+    a ~ dnorm(4, 4),
+    bg ~ dnorm(0, 5),
+    sigma ~ dunif(0, 10)
+  ), data = d
+)
+
+# Compute the interval to shade on the plot
+area_sequence <- seq(from = 0, to = round(max(d$area)) + 1, length.out = 100)
+mu1 <- link(lmod1, data = data.frame(area = area_sequence))
+groupsize_sequence <- seq(from = 0, to = round(max(d$groupsize)) + 1, length.out = 100)
+mu2 <- link(lmod2, data = data.frame(groupsize = groupsize_sequence))
+mu1_mean <- apply(mu1, 2, mean) 
+mu2_mean <- apply(mu2, 2, mean)
+mu1_95PI <- apply(mu1, 2, PI, prob = 0.95) 
+mu2_95PI <- apply(mu2, 2, PI, prob = 0.95)
+
+# Plot results
+plot(weight ~ area, data = d)
+lines(area_sequence, mu1_mean)
+shade(mu1_95PI, area_sequence)
+
+plot(weight ~ groupsize, data = d)
+lines(groupsize_sequence, mu2_mean)
+shade(mu2_95PI, groupsize_sequence)
+
+# Determine whether either variable is important to the model on its own 
+precis(lmod1) 
+precis(lmod2)
+
+# Neither seems significant just from looking at the values
+# But we can also compute classical OLS to see if either predictor is significant
+summary(lm(weight ~ area, data = d)) # just as expected, not significant 
+summary(lm(weight ~ groupsize, data = d)) # again just as expected, not significant
+```
+
+##\textcolor{cyan}{5H2 (2 points)}
+
+This time we want to fit a multiple linear regression with weight as the response and area and groupsize as the predictors. Then we want to plot the predictions of the model for each predictor, while holding the other predictor constant, and compare to the results we got in the previous question. We should then answer why we get different results using this method as opposed to the method in the previous question. 
+
+```{r}
+# Compute the model 
+lmod5h2 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bt * area + bg * groupsize, 
+    a ~ dnorm(0, 100), # We have no idea what the mean/sd are this time, so make conservative estimate
+    bt ~ dnorm(0, 10),
+    bg ~ dnorm(0, 10), 
+    sigma ~ dunif(0, 10)
+  ), data = d 
+)
+
+# Take a look at the model 
+precis(lmod5h2) # This time, both predictors look significant
+# Compare to classical OLS to see if they're significant in that model too 
+summary(lm(weight ~ area + groupsize, data = d)) # Both significant, as expected
+
+# Plot weight ~ area while holding groupsize constant at its mean
+area_sequence <- seq(0, round(max(d$area) + 1))
+area_prediction <- data.frame(area = area_sequence, 
+                              groupsize = mean(d$groupsize))
+mu_area <- link(lmod5h2, area_prediction)
+mu_area_mean <- apply(mu_area, 2, mean)
+mu_area_PI <- apply(mu_area, 2, PI, prob = 0.95) # use 0.95 since 5H1 did
+plot(weight ~ area, data = d, main = "weight ~ area while holding groupsize constant")
+lines(area_sequence, mu_area_mean)
+shade(object = mu_area_PI, lim = area_sequence)
+
+# Plot weight ~ groupsize while holding area constant at its mean
+groupsize_sequence <- seq(0, round(max(d$groupsize) + 1))
+groupsize_prediction <- data.frame(groupsize = groupsize_sequence, 
+                              area = mean(d$area))
+mu_groupsize <- link(lmod5h2, groupsize_prediction)
+mu_groupsize_mean <- apply(mu_groupsize, 2, mean)
+mu_groupsize_PI <- apply(mu_groupsize, 2, PI, prob = 0.95) # use 0.95 since 5H1 did
+plot(weight ~ groupsize, data = d, main = "weight ~ groupssize while holding area constant")
+lines(groupsize_sequence, mu_groupsize_mean)
+shade(object = mu_groupsize_PI, lim = groupsize_sequence)
+
+# Alone, neither one was significant, but together, they were both significant. 
+```
+
+##\textcolor{cyan}{5H3 (2 points)}
+
+This time we want to consider 2 new models: one will be weight ~ avgfood + groupsize, and the other will be weight ~ avgfood + groupsize + area. We then want to compare these two models to the ones we had before, as well as decide whether avgfood or area is the better predictor if we had to choose only one, supporting our decision with any plots/tables that we may need. 
+
+Finally, after fitting the model, we'll observe that when both avgfood and area are included in the model, their standard errors are larger than when they are included in separate models, and their effects are essentially reduced (close to 0). We can go ahead and explain this one right now since it's easy: They're collinear. 
+
+```{r}
+library(rethinking)
+data(foxes)
+d <- foxes
+cor(d)[4, 2] # as expected, high correlation 
+```
+
+Now let's answer the first part: 
+
+```{r}
+# Model containing only avgfood and groupsize
+lmod5h3_1 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + ba * avgfood + bg * groupsize, 
+    a ~ dnorm(0, 10), # We have no idea what the mean/sd are this time, so make conservative estimate
+    ba ~ dnorm(0, 10),
+    bg ~ dnorm(0, 10), 
+    sigma ~ dunif(0, 10)
+  ), data = d 
+)
+
+# Model containing avgfood, groupsize, and area
+lmod5h3_2 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bt * area + bg * groupsize + ba * avgfood, 
+    a ~ dnorm(0, 100), # We have no idea what the mean/sd are this time, so make conservative estimate
+    bt ~ dnorm(0, 10),
+    bg ~ dnorm(0, 10),
+    ba ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ), data = d 
+)
+
+# Take a look at the models
+precis(lmod5h3_1)
+precis(lmod5h3_2)
+# They all look significant, in the first one, but avgfood and area don't look significant in the 2nd
+# let's see what classical OLS thinks about this
+summary(lm(weight ~ avgfood + groupsize, data = d))
+summary(lm(weight ~ avgfood + groupsize + area, data = d))
+# As expected, when both avgfood and area are included in the same model, neither are significant
+# This happened since they are collinear
+
+# Since they're collinear, we want to decide which one of the two would be better to include
+# in the model 
+# We do this by plotting each one of the predictors we're interested in while keeping the others 
+# constant at their means 
+
+# Plot weight ~ avgfood while keeping groupsize and area constant at their means
+avgfood_sequence <- seq(0, round(max(d$avgfood) + 1))
+avgfood_prediction <- data.frame(avgfood = avgfood_sequence,
+                              groupsize = mean(d$groupsize), 
+                              area = mean(d$area))
+mu_avgfood <- link(lmod5h3_2, avgfood_prediction)
+mu_avgfood_mean <- apply(mu_avgfood, 2, mean)
+mu_avgfood_PI <- apply(mu_avgfood, 2, PI, prob = 0.95) # use 0.95 since 5H1 did
+plot(weight ~ avgfood, data = d, main = "weight ~ avgfood while holding area+groupsize constant")
+lines(avgfood_sequence, mu_avgfood_mean)
+shade(object = mu_avgfood_PI, lim = avgfood_sequence) 
+
+# Plot weight ~ area while keeping groupsize and avgfood constant at their means
+area_sequence <- seq(0, round(max(d$area) + 1))
+area_prediction <- data.frame(area = area_sequence,
+                              groupsize = mean(d$groupsize), 
+                              avgfood = mean(d$avgfood))
+mu_area <- link(lmod5h3_2, area_prediction)
+mu_area_mean <- apply(mu_area, 2, mean)
+mu_area_PI <- apply(mu_area, 2, PI, prob = 0.95) # use 0.95 since 5H1 did
+plot(weight ~ area, data = d, main = "weight ~ avgfood while holding area+groupsize constant")
+lines(area_sequence, mu_area_mean)
+shade(object = mu_area_PI, lim = area_sequence) 
+
+# Visually, it appears like weight ~ area is better, since the interval is tighter
+# Let's confirm using OLS, even though we haven't learned about goodness of fit in this class yet
+summary(lm(weight ~ avgfood + groupsize, data = d))
+summary(lm(weight ~ area + groupsize, data = d))
+# Both are fairly crappy, but we can see that using area is just slightly better. 
+```
