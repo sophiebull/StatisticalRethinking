@@ -1,0 +1,117 @@
+---
+title: "Statistical Rethinking: Homework Problems"
+author: "Melissa Van Bussel"
+date: "June 12, 2018"
+output:
+  pdf_document:
+    highlight: zenburn
+    latex_engine: lualatex
+  html_document: default
+mainfont: Arial
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#\textcolor{cyan}{5H3}
+
+This time we want to consider 2 new models: one will be weight ~ avgfood + groupsize, and the other will be weight ~ avgfood + groupsize + area. We then want to compare these two models to the ones we had before, as well as decide whether avgfood or area is the better predictor if we had to choose only one, supporting our decision with any plots/tables that we may need. 
+
+Finally, after fitting the model, we'll observe that when both avgfood and area are included in the model, their standard errors are larger than when they are included in separate models, and their effects are essentially reduced (close to 0). We can go ahead and explain this one right now since it's easy: They're collinear. 
+
+```{r, message = FALSE, warning = FALSE}
+library(rethinking)
+data(foxes)
+d <- foxes
+cor(d) # as expected, high correlation 
+```
+
+Now let's answer the first part. First, we create the two new models. I'll be using very conservative priors, since we don't really know how much each predictor should contribute to the overall model. 
+
+```{r}
+# Model containing only avgfood and groupsize
+lmod5h3_1 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + ba * avgfood + bg * groupsize, 
+    a ~ dnorm(0, 10), 
+    ba ~ dnorm(0, 10),
+    bg ~ dnorm(0, 10), 
+    sigma ~ dunif(0, 10)
+  ), data = d 
+)
+
+# Model containing avgfood, groupsize, and area
+lmod5h3_2 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bt * area + bg * groupsize + ba * avgfood, 
+    a ~ dnorm(0, 10), 
+    bt ~ dnorm(0, 10),
+    bg ~ dnorm(0, 10),
+    ba ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ), data = d 
+)
+```
+
+Now, we can take a look at the models we've just created.
+
+```{r}
+precis(lmod5h3_1, prob = 0.95)
+precis(lmod5h3_2, prob = 0.95)
+```
+
+In the first model, all of the predictors look "important" (or whatever word you might want to use), but in the second model, **avgfood** and **area** don't look "important", since the intervals include 0. We expected this to happen - the question told us this ahead of time, plus we've already observed that these two predictors are collinear. 
+
+To gain a deeper understanding, we can also compare our results to the models calculated by classical OLS, and see if these predictors are significant in the classical sense.
+
+```{r}
+summary(lm(weight ~ avgfood + groupsize, data = d))
+summary(lm(weight ~ avgfood + groupsize + area, data = d))
+```
+
+As expected, when both **avgfood** and **area** are included in the same model, neither are significant. This happened because these two predictors are collinear. Since they're collinear, we now want to decide which one of the two would be better to include in the model. There are various ways od doing this, but one such way is by plotting each one of the predictors we're interested in while keeping the others constant at their means (similar to in question 5H2). 
+
+```{r}
+# Set up: Plot weight ~ avgfood while keeping groupsize and area constant at their means
+avgfood_sequence <- seq(0, round(max(d$avgfood) + 1))
+avgfood_prediction <- data.frame(avgfood = avgfood_sequence,
+                              groupsize = mean(d$groupsize), 
+                              area = mean(d$area))
+mu_avgfood <- link(lmod5h3_2, avgfood_prediction)
+mu_avgfood_mean <- apply(mu_avgfood, 2, mean)
+mu_avgfood_PI <- apply(mu_avgfood, 2, PI, prob = 0.95) # use 0.95 since 5H1 did
+
+# Set up: Plot weight ~ area while keeping groupsize and avgfood constant at their means
+area_sequence <- seq(0, round(max(d$area) + 1))
+area_prediction <- data.frame(area = area_sequence,
+                              groupsize = mean(d$groupsize), 
+                              avgfood = mean(d$avgfood))
+mu_area <- link(lmod5h3_2, area_prediction)
+mu_area_mean <- apply(mu_area, 2, mean)
+mu_area_PI <- apply(mu_area, 2, PI, prob = 0.95) # use 0.95 since 5H1 did
+
+# Actually plot them now 
+par(mfrow = c(1, 2))
+plot(weight ~ avgfood, data = d, main = "weight ~ avgfood while holding area+groupsize constant",
+     cex.main = 0.6)
+lines(avgfood_sequence, mu_avgfood_mean)
+shade(object = mu_avgfood_PI, lim = avgfood_sequence) 
+plot(weight ~ area, data = d, main = "weight ~ avgfood while holding area+groupsize constant",
+     cex.main = 0.6)
+lines(area_sequence, mu_area_mean)
+shade(object = mu_area_PI, lim = area_sequence) 
+```
+
+Visually, it appears like weight ~ area is better, since the interval is tighter. We can also take a look at classical OLS regression to see if the two methods agree. 
+
+```{r}
+summary(lm(weight ~ avgfood + groupsize, data = d))
+summary(lm(weight ~ area + groupsize, data = d))
+```
+
+We can see that both of these models are pretty terrible, but the first one is slightly better, which disagrees with the conclusion we made earlier. This tells us that there are perhaps better ways to measure goodness of fit when it comes to Bayesian models, and in fact, that's what chapter 6 is all about. 
+
+One last note: If you recall from the correlation matrix, **avgfood** and **groupsize** were even more highly correlated with each other than **avgfood** and **area** were, which explains why neither one of these models were very good. We should probably only be including one of the 3 predictors in the model if we want to see some improvement. 
